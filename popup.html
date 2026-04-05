@@ -2,11 +2,11 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <title>Pixso Tuner</title>
+    <title>3,14 XO</title>
     <style>
       body {
         font-family: system-ui, sans-serif;
-        width: 300px;
+        width: 320px;
         max-height: 560px;
         margin: 0;
         box-sizing: border-box;
@@ -20,15 +20,20 @@
       h1 {
         font-size: 1.05rem;
         font-weight: 600;
-        margin: 0 0 12px;
+      }
+      h2 {
+        font-size: 0.95rem;
+        margin: 16px 0 10px;
+        font-weight: 600;
       }
       label {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 8px;
         margin-bottom: 10px;
         cursor: pointer;
-        font-size: 0.9rem;
+        font-size: 0.88rem;
+        line-height: 1.35;
       }
       .row {
         margin-bottom: 12px;
@@ -68,55 +73,52 @@
         font-size: 0.85rem;
         min-height: 1.2em;
       }
-      h2 {
-        font-size: 0.95rem;
-        margin: 18px 0 10px;
-        font-weight: 600;
-      }
       code {
         font-size: 0.85em;
       }
-      .footer {
-        padding: 10px;
-        background-color: #f0f0f0;
-        font-size: 0.8rem;
-      }
-      .footer a {
-        color: #06c;
+      .conditional-block.is-hidden {
+        display: none;
       }
     </style>
   </head>
   <body>
     <div class="container">
-    <h1>3,14 XO</h1>
-    <label>
-      <input type="checkbox" id="enabled" />
-      Автосохранение в файл .pix
-    </label>
-    <div class="row">
-      <input type="number" id="interval" min="1" max="120" step="1" value="10" /> (мин.)
-    </div>
-    <label>
-      <input type="checkbox" id="renamePix" />
-      Шаблон имени файла
-    </label>
-    <div class="row">
-      <input
-        type="text"
-        id="template"
-        spellcheck="false"
-        placeholder="{{date}}-{{title}}.pix"
-      />
-      <p class="hint">
-        <code>{{date}}</code>, <code>{{title}}</code>, <code>{{raw}}</code> — подстановки.
-      </p>
-    </div>
-    <button type="button" id="save">Сохранить</button>   <span class="ok" id="status"></p>
-    </div>
-    <div class="footer">
-      <a href="#" id="open-full-options">Github</a>
+      <h1>3,14 XO</h1>
+      <div class="hint" style="margin-bottom: 1em;">Pixso с преферансом и куртизинками</div>
+      <!-- <h2>Интерфейс</h2> -->
+      <label>
+        <input type="checkbox" id="trimPlugins" />
+        Скрыть Enterprise plugins
+      </label>
+      <label>
+        <input type="checkbox" id="exportPixButton" />
+        Кнопка сохранения в файл на панели
+      </label>
+      <label>
+        <input type="checkbox" id="enabled" />
+        Автосохранение в файл
+      </label>
+      <div id="intervalRow" class="row conditional-block">
+        <input type="number" id="interval" min="1" max="120" step="1" value="10" /> (мин.)
+      </div>
+      <label>
+        <input type="checkbox" id="renamePix" />
+        Шаблон имени сохраняемого файла
+      </label>
+      <div id="templateBlock" class="row conditional-block">
+        <input
+          type="text"
+          id="template"
+          spellcheck="false"
+          placeholder="{{date}}-{{title}}.pix"
+        />
+        <p class="hint">
+          <code>{{date}}</code>, <code>{{title}}</code>, <code>{{raw}}</code>
+        </p>
+      </div>
+      <button type="button" id="save">Сохранить</button>
+      <span class="ok" id="status"></span>
     </div>
     <script src="options.js"></script>
-    <script src="popup.js"></script>
   </body>
 </html>

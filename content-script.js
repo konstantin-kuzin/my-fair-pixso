@@ -35,6 +35,18 @@ function removePinnedPluginItems(root = document) {
   });
 }
 
+let trimPluginsListEnabled = true;
+let exportPixButtonEnabled = true;
+
+async function loadFeatureFlags() {
+  const d = await chrome.storage.local.get({
+    trimPluginsListEnabled: true,
+    exportPixButtonEnabled: true
+  });
+  trimPluginsListEnabled = d.trimPluginsListEnabled !== false;
+  exportPixButtonEnabled = d.exportPixButtonEnabled !== false;
+}
+
 /** querySelector с обходом открытых shadowRoot (меню часто внутри веб-компонентов) */
 function querySelectorDeep(root, selector) {
   if (!(root instanceof Node)) return null;
@@ -351,7 +363,12 @@ function buildExportPixButton() {
 }
 
 function ensureExportPixButton() {
-  if (document.querySelector('[data-pixso-tuner="export-pix"]')) return;
+  const existing = document.querySelector('[data-pixso-tuner="export-pix"]');
+  if (!exportPixButtonEnabled) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (existing) return;
 
   const slot = document.querySelector('.top-menu--mid__opreation');
   if (!slot) return;
@@ -360,7 +377,9 @@ function ensureExportPixButton() {
 }
 
 function onDomMutation() {
-  removePinnedPluginItems();
+  if (trimPluginsListEnabled) {
+    removePinnedPluginItems();
+  }
   ensureExportPixButton();
 }
 
@@ -384,10 +403,17 @@ function ensureExportPixIconStyles() {
   document.documentElement.appendChild(el);
 }
 
-function init() {
+async function init() {
+  await loadFeatureFlags();
   ensureExportBridge();
   ensureExportPixIconStyles();
   onDomMutation();
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (!changes.trimPluginsListEnabled && !changes.exportPixButtonEnabled) return;
+    void loadFeatureFlags().then(() => onDomMutation());
+  });
 
   const observer = new MutationObserver(() => {
     onDomMutation();
@@ -400,7 +426,7 @@ function init() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', () => void init());
 } else {
-  init();
+  void init();
 }
