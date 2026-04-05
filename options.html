@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pixso Tuner — автоэкспорт .pix</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 420px;
+        margin: 24px;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0 0 16px;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        cursor: pointer;
+      }
+      .row {
+        margin-bottom: 16px;
+      }
+      .row label {
+        display: block;
+        cursor: default;
+        margin-bottom: 6px;
+        font-size: 0.9rem;
+      }
+      input[type='number'] {
+        width: 72px;
+        padding: 6px 8px;
+      }
+      input[type='text'] {
+        width: 100%;
+        max-width: 380px;
+        box-sizing: border-box;
+        padding: 6px 8px;
+      }
+      button {
+        padding: 8px 16px;
+        cursor: pointer;
+      }
+      .hint {
+        font-size: 0.85rem;
+        color: #555;
+        margin-top: 12px;
+        line-height: 1.45;
+      }
+      .ok {
+        color: #0a0;
+        margin-top: 8px;
+        font-size: 0.9rem;
+        min-height: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Автоэкспорт Pixso Design File (.pix)</h1>
+    <label>
+      <input type="checkbox" id="enabled" />
+      Включить автоматическую выгрузку файла
+    </label>
+    <div class="row">
+      <label for="interval">Интервал (минут)</label>
+      <input type="number" id="interval" min="1" max="120" step="1" value="10" />
+    </div>
+    <button type="button" id="save">Сохранить настройки</button>
+    <p class="ok" id="status"></p>
+
+    <h2 style="font-size: 1rem; margin: 24px 0 12px; font-weight: 600">Имя файла при сохранении .pix</h2>
+    <label>
+      <input type="checkbox" id="renamePix" />
+      Задавать имя файла при загрузке (экспорт и автоэкспорт)
+    </label>
+    <div class="row">
+      <label for="template">Шаблон имени</label>
+      <input
+        type="text"
+        id="template"
+        spellcheck="false"
+        placeholder="{{date}}-{{title}}.pix"
+      />
+      <p class="hint" style="margin-top: 8px">
+        Подстановки: <code>{{date}}</code> — дата и время,
+        <code>{{title}}</code> — имя, которое предлагает Pixso (без .pix),
+        <code>{{raw}}</code> — исходное имя файла целиком. Расширение
+        <code>.pix</code> добавится само, если его нет в шаблоне.
+      </p>
+    </div>
+
+    <p class="hint">
+      По таймеру выполняется тот же сценарий, что и при нажатии кнопки экспорта на панели
+      (меню → Export → Pixso Design File). Срабатывает только когда активна вкладка с
+      редактором Pixso. Минимальный интервал — 1 минута (ограничение Chrome). При каждом
+      срабатывании браузер может показывать диалог сохранения файла — это ожидаемо.
+    </p>
+    <script src="options.js"></script>
+  </body>
+</html>
