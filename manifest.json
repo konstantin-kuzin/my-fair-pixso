@@ -1,13 +1,27 @@
 {
     "manifest_version": 3,
-    "name": "Pixso My Plugins Trimmer",
-    "version": "1.2.2",
+    "name": "3.14 XO",
+    "version": "1.1",
     "description": "Удаляет лишние строки My Plugins, экспорт .pix, автоэкспорт, шаблон имени файла при загрузке .pix.",
     "permissions": ["storage", "alarms", "downloads"],
     "background": {
       "service_worker": "background.js"
     },
     "options_page": "options.html",
+    "icons": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "action": {
+      "default_title": "Настройки",
+      "default_popup": "popup.html",
+      "default_icon": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png"
+      }
+    },
     "web_accessible_resources": [
       {
         "resources": ["export-bridge.js"],

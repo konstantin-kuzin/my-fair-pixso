@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pixso Tuner</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        width: 300px;
+        max-height: 560px;
+        margin: 0;
+        box-sizing: border-box;
+        color: #1a1a1a;
+        font-size: 0.9rem;
+      }
+      .container {
+        padding: 16px;
+        overflow-y: auto;
+      }
+      h1 {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin: 0 0 12px;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      .row {
+        margin-bottom: 12px;
+      }
+      .row label {
+        display: block;
+        cursor: default;
+        margin-bottom: 6px;
+        font-size: 0.85rem;
+      }
+      input[type='number'] {
+        width: 48px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        border: 1px solid #e0e0e0;
+      }
+      input[type='text'] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 8px;
+        border-radius: 4px;
+        border: 1px solid #e0e0e0;
+      }
+      button {
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      .hint {
+        font-size: 0.8rem;
+        color: #555;
+        margin-top: 8px;
+        line-height: 1.4;
+      }
+      .ok {
+        color: #0a0;
+        margin-top: 6px;
+        font-size: 0.85rem;
+        min-height: 1.2em;
+      }
+      h2 {
+        font-size: 0.95rem;
+        margin: 18px 0 10px;
+        font-weight: 600;
+      }
+      code {
+        font-size: 0.85em;
+      }
+      .footer {
+        padding: 10px;
+        background-color: #f0f0f0;
+        font-size: 0.8rem;
+      }
+      .footer a {
+        color: #06c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+    <h1>3,14 XO</h1>
+    <label>
+      <input type="checkbox" id="enabled" />
+      Автосохранение в файл .pix
+    </label>
+    <div class="row">
+      <input type="number" id="interval" min="1" max="120" step="1" value="10" /> (мин.)
+    </div>
+    <label>
+      <input type="checkbox" id="renamePix" />
+      Шаблон имени файла
+    </label>
+    <div class="row">
+      <input
+        type="text"
+        id="template"
+        spellcheck="false"
+        placeholder="{{date}}-{{title}}.pix"
+      />
+      <p class="hint">
+        <code>{{date}}</code>, <code>{{title}}</code>, <code>{{raw}}</code> — подстановки.
+      </p>
+    </div>
+    <button type="button" id="save">Сохранить</button>   <span class="ok" id="status"></p>
+    </div>
+    <div class="footer">
+      <a href="#" id="open-full-options">Github</a>
+    </div>
+    <script src="options.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
