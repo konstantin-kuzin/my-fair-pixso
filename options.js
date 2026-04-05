@@ -2,7 +2,7 @@ const DEFAULTS = {
   autosaveEnabled: false,
   autosaveIntervalMinutes: 10,
   renamePixDownloads: false,
-  pixDownloadFilenameTemplate: '{{date}}-{{title}}.pix',
+  pixDownloadFilenameTemplate: '{{date}} {{title}}.pix',
   trimPluginsListEnabled: true,
   exportPixButtonEnabled: true
 };
@@ -67,7 +67,7 @@ async function save() {
   }
   window.setTimeout(() => {
     window.close();
-  }, 1000);
+  }, 500);
 }
 
 if (saveBtn) saveBtn.addEventListener('click', save);

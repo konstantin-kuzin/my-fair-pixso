@@ -2,11 +2,11 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <title>3,14 XO</title>
+    <title>My Fair Pixso</title>
     <style>
       body {
         font-family: system-ui, sans-serif;
-        width: 320px;
+        width: 350px;
         max-height: 560px;
         margin: 0;
         box-sizing: border-box;
@@ -83,8 +83,8 @@
   </head>
   <body>
     <div class="container">
-      <h1>3,14 XO</h1>
-      <div class="hint" style="margin-bottom: 1em;">Pixso с преферансом и куртизинками</div>
+      <h1>My Fair Pixso</h1>
+      <div class="hint" style="margin-bottom: 1em;">Pixso с преферансом и куртизанками</div>
       <!-- <h2>Интерфейс</h2> -->
       <label>
         <input type="checkbox" id="trimPlugins" />
@@ -92,14 +92,13 @@
       </label>
       <label>
         <input type="checkbox" id="exportPixButton" />
-        Кнопка сохранения в файл на панели
+        Добавить на панель кнопку сохранения 
       </label>
       <label>
         <input type="checkbox" id="enabled" />
         Автосохранение в файл
       </label>
-      <div id="intervalRow" class="row conditional-block">
-        <input type="number" id="interval" min="1" max="120" step="1" value="10" /> (мин.)
+      <div id="intervalRow" class="row conditional-block">раз в <input type="number" id="interval" min="1" max="120" step="1" value="10" /> мин.
       </div>
       <label>
         <input type="checkbox" id="renamePix" />
@@ -117,7 +116,7 @@
         </p>
       </div>
       <button type="button" id="save">Сохранить</button>
-      <span class="ok" id="status"></span>
+      <span class="ok" id="status" style="margin-left: 1em;"></span>
     </div>
     <script src="options.js"></script>
   </body>

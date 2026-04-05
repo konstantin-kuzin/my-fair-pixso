@@ -141,7 +141,7 @@ function simulateClickOnElement(el) {
   return true;
 }
 
-/** Клик / hover в MAIN world через export-bridge.js */
+/** Клик / hover в MAIN world через export.js */
 function requestPageBridgeExportPix() {
   const send = () =>
     window.postMessage(
@@ -176,7 +176,7 @@ function ensureExportBridge() {
   if (document.querySelector('script[data-pixso-tuner-bridge]')) return;
   const s = document.createElement('script');
   s.dataset.pixsoTunerBridge = '1';
-  s.src = chrome.runtime.getURL('export-bridge.js');
+  s.src = chrome.runtime.getURL('export.js');
   (document.head || document.documentElement).appendChild(s);
 }
 
@@ -303,9 +303,10 @@ function runExportPixFlow() {
 }
 
 const SAVE_SVG =
-  '<svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-  '<path fill-rule="evenodd" d="M11.5365 1.11609L2.74985 1.11609C1.83858 1.11609 1.09985 1.85482 1.09985 2.76609L1.09985 13.2338C1.09985 14.1451 1.83858 14.8838 2.74985 14.8838L13.2499 14.8838C14.1611 14.8838 14.8999 14.1451 14.8999 13.2338L14.8999 4.54995C14.8999 4.38044 14.8336 4.21765 14.7153 4.09626L12.002 1.3124C11.8796 1.18688 11.7118 1.11609 11.5365 1.11609ZM2.74985 2.41609C2.55655 2.41609 2.39985 2.57279 2.39985 2.76609L2.39985 13.2338C2.39985 13.4271 2.55655 13.5838 2.74985 13.5838L4.09558 13.5838L4.09558 8.87961C4.09558 8.29971 4.56568 7.82961 5.14558 7.82961L10.8061 7.82961C11.386 7.82961 11.8561 8.29971 11.8561 8.87961L11.8561 13.5838L13.2499 13.5838C13.4432 13.5838 13.5999 13.4271 13.5999 13.2338L13.5999 4.81431L11.2624 2.41609L11.1166 2.41609L11.1166 4.30453C11.1166 4.88443 10.6465 5.35453 10.0666 5.35453L5.14558 5.35453C4.56568 5.35453 4.09558 4.88443 4.09558 4.30453L4.09558 2.41609L2.74985 2.41609ZM5.39558 2.41609L9.81661 2.41609L9.81661 4.05453L5.39558 4.05453L5.39558 2.41609ZM5.39558 9.12961L5.39558 13.5838L10.5561 13.5838L10.5561 9.12961L5.39558 9.12961Z" fill="currentColor"></path>' +
+  '<svg width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+  '<path id="Vector 1" d="M22.6667 12.0027C25.5667 12.0187 27.1374 12.148 28.1614 13.172C29.3334 14.344 29.3334 16.2294 29.3334 20L29.3334 21.3334C29.3334 25.1054 29.3334 26.9907 28.1614 28.1627C26.9907 29.3334 25.1041 29.3334 21.3334 29.3334L10.6667 29.3334C6.89608 29.3334 5.00941 29.3334 3.83875 28.1627C2.66675 26.9894 2.66675 25.1054 2.66675 21.3334L2.66675 20C2.66675 16.2294 2.66675 14.344 3.83875 13.172C4.86275 12.148 6.43341 12.0187 9.33342 12.0027" fill-rule="nonzero" stroke="#000000" stroke-linecap="round" stroke-width="2.000000" /><path id="Vector 2" d="M16 2.66663L16 20M20 15.3333L16 20L12 15.3333" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.000000" />' +
   '</svg>';
+
 
 function buildExportPixButton() {
   const wrap = document.createElement('div');
@@ -370,7 +371,7 @@ function ensureExportPixButton() {
   }
   if (existing) return;
 
-  const slot = document.querySelector('.top-menu--mid__opreation');
+  const slot = document.querySelector('.top-menu--center--tools');
   if (!slot) return;
 
   slot.appendChild(buildExportPixButton());
