@@ -523,34 +523,10 @@ function ensureExportPixButton() {
   slot.appendChild(buildExportPixButton());
 }
 
-/** Высота строки в CSS модалки публикации (стили строки, не вирт. список) */
-const LIBRARY_PUBLISH_ROW_HEIGHT_PX = 24;
-
-function removePublishLiImageBoxNodes(root) {
-  if (!(root instanceof Element)) return;
-  root
-    .querySelectorAll(
-      '.publish--detail--li-image-box, .publish-detail--li-image-box'
-    )
-    .forEach((node) => {
-      try {
-        node.remove();
-      } catch (_) {
-        /* ignore */
-      }
-    });
-}
-
 /**
- * Виртуальный список монтирует в DOM только видимое «окно» строк.
- * Перестановка .item и расчёт height wrapper как суммы детей ломали прокрутку: оставалась
- * высота лишь по видимым узлам — остальные элементы становились недоступны.
- * Алфавитная сортировка по полному списку без API Pixso здесь недоступна.
- * Оставляем безопасную часть: вырезание превью-блоков из текущего среза DOM.
+ * Раньше здесь убирали превью и поджимали строки — исходный список Pixso не трогаем.
  */
-function relayoutLibraryPublishItems(wrapper) {
-  removePublishLiImageBoxNodes(wrapper);
-}
+function relayoutLibraryPublishItems(_wrapper) {}
 
 const PUBLISH_SORTED_UI_STYLE_ID = 'pixso-tuner-publish-sorted-ui';
 const PUBLISH_SORTED_INLINE_ID = 'pixso-tuner-publish-sorted-inline';
@@ -587,6 +563,11 @@ function normalizePublishGroupTitle(raw) {
     return 'Changes';
   }
   return s.trim();
+}
+
+/** Только секция Changes — чекбоксы строк можно переключать; в Unchanged / Hide и пр. — заблокированы. */
+function isLibraryPublishChangesSectionTitle(title) {
+  return normalizePublishGroupTitle(title) === 'Changes';
 }
 
 /**
@@ -855,22 +836,35 @@ function ensurePublishSortedOverlayStyles() {
     '.library-publish-container.pixso-tuner-publish-sorted-active .' +
     PUBLISH_SORTED_HOST_CLASS +
     '>.wrapper{opacity:0!important;pointer-events:none!important}' +
-    '.pixso-tuner-publish-sorted-panel{display:flex;flex-direction:column;min-height:0;font:11px/1.2 system-ui,-apple-system,sans-serif;color:#19191a;overscroll-behavior:contain;touch-action:manipulation;pointer-events:auto}' +
+    '.pixso-tuner-publish-sorted-panel{display:flex;flex-direction:column;min-height:0;font:12px/1.2 system-ui,-apple-system,sans-serif;color:#19191a;overscroll-behavior:contain;touch-action:manipulation;pointer-events:auto}' +
     '.pixso-tuner-publish-sorted-inline{position:sticky;top:0;left:0;right:0;width:100%;z-index:10;min-height:100%;max-height:100%;box-sizing:border-box;background:var(--color-bg,rgba(255,255,255,.98));flex-shrink:0}' +
     '.pixso-tuner-publish-sorted-overlay{position:fixed;z-index:2147483646;right:24px;top:80px;width:min(420px,calc(100vw - 48px));max-height:min(70vh,640px);background:var(--color-bg,rgba(255,255,255,.98));border:1px solid rgba(0,0,0,.12);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18)}' +
     '.pixso-tuner-publish-sorted-inline .pixso-tuner-publish-sorted-list{flex:1;min-height:0}' +
-    '.pixso-tuner-publish-sorted-h{font-size:11px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.08);font-weight:600;flex-shrink:0}' +
-    '.pixso-tuner-publish-sorted-h button{border:0;background:transparent;cursor:pointer;padding:4px 8px;border-radius:6px;font:inherit;color:inherit}' +
-    '.pixso-tuner-publish-sorted-h button:hover{background:rgba(0,0,0,.06)}' +
     '.pixso-tuner-publish-sorted-list{overflow:auto;padding:6px 0;overscroll-behavior:contain;touch-action:pan-y}' +
-    '.pixso-tuner-publish-sorted-row{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid rgba(0,0,0,.04)}' +
-    '.pixso-tuner-publish-sorted-row:last-child{border-bottom:0}' +
+    '.pixso-tuner-publish-sorted-row{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;padding:4px 8px 4px 16px;}' +
     '.pixso-tuner-publish-sorted-cb{width:12px;height:12px;margin:0;cursor:pointer;flex-shrink:0}' +
-    '.pixso-tuner-publish-sorted-sec{font-size:11px;font-weight:600;padding:6px 12px;color:rgba(0,0,0,.55);border-bottom:1px solid rgba(0,0,0,.06)}' +
-    '.pixso-tuner-publish-sorted-st{font-size:11px;opacity:.65;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-    '.pixso-tuner-publish-scan-btn{margin:8px 12px 0;font:inherit;padding:6px 12px;border-radius:8px;border:1px solid rgba(0,0,0,.15);background:var(--color-bg,rgba(255,255,255,.95));cursor:pointer;align-self:flex-start}' +
-    '.pixso-tuner-publish-scan-btn:disabled{opacity:.55;cursor:wait}' +
-    '.pixso-tuner-publish-scan-wrap{padding:0 12px 8px}';
+    '.pixso-tuner-publish-sorted-cb:disabled{opacity:.45;cursor:not-allowed}' +
+    '.pixso-tuner-publish-sorted-sec{font-size:12px;font-weight:600;padding:6px 16px;color:rgba(0,0,0,.55);border-bottom:1px solid rgba(0,0,0,.06)}' +
+    '.pixso-tuner-publish-sorted-st{font-size:12px;opacity:.65;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.library-publish-container .pixso-tuner-publish-scan-wrap{display:flex!important;align-items:center!important;padding:8px 16px 8px!important;box-sizing:border-box!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-toggle{display:inline-flex!important;align-items:center!important;gap:8px!important;cursor:pointer!important;font:inherit!important;font-size:12px!important;color:inherit!important;user-select:none!important;margin:0!important;position:relative!important;box-sizing:border-box!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-wrap input.pixso-tuner-publish-scan-toggle-input[type=checkbox]{' +
+    'position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;' +
+    'overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;opacity:0!important;' +
+    'appearance:none!important;-webkit-appearance:none!important;pointer-events:none!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-switch{' +
+    'position:relative!important;display:block!important;width:32px!important;height:16px!important;flex-shrink:0!important;' +
+    'border-radius:8px!important;background:rgba(0,0,0,.22)!important;transition:background .15s ease!important;' +
+    'pointer-events:none!important;box-sizing:border-box!important;margin:0!important;padding:0!important;border:0!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-switch-knob{' +
+    'position:absolute!important;display:block!important;width:12px!important;height:12px!important;border-radius:50%!important;' +
+    'background:#fff!important;top:2px!important;left:2px!important;box-shadow:0 1px 2px rgba(0,0,0,.2)!important;' +
+    'transition:transform .15s ease!important;margin:0!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-toggle-input:checked+.pixso-tuner-publish-scan-switch{background:var(--color-primary,#18a0fb)!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-toggle-input:checked+.pixso-tuner-publish-scan-switch .pixso-tuner-publish-scan-switch-knob{transform:translateX(16px)!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-toggle-input:disabled+.pixso-tuner-publish-scan-switch{opacity:.55!important;cursor:wait!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-toggle:has(.pixso-tuner-publish-scan-toggle-input:focus-visible) .pixso-tuner-publish-scan-switch{box-shadow:0 0 0 2px var(--color-primary,#18a0fb)!important}' +
+    '.library-publish-container .pixso-tuner-publish-scan-toggle-text{line-height:1.2!important}';
 }
 
 /**
@@ -1190,7 +1184,7 @@ function setPublishSortedCheckboxesAll(wantChecked) {
     panel
       .querySelectorAll('input.pixso-tuner-publish-sorted-cb[type="checkbox"]')
       .forEach((inp) => {
-        inp.checked = wantChecked;
+        if (!inp.disabled) inp.checked = wantChecked;
       });
   } finally {
     queueMicrotask(() => {
@@ -1264,26 +1258,12 @@ function removePublishSortedOverlay() {
 
 function renderPublishSortedOverlay(bundle) {
   const sections = bundle && bundle.sections ? bundle.sections : [];
-  const total =
-    bundle && typeof bundle.total === 'number'
-      ? bundle.total
-      : sections.reduce((n, s) => n + (s.rows ? s.rows.length : 0), 0);
 
   ensurePublishSortedOverlayStyles();
   removePublishSortedOverlay();
 
   const root = document.createElement('div');
   root.className = 'pixso-tuner-publish-sorted-panel';
-
-  const head = document.createElement('div');
-  head.className = 'pixso-tuner-publish-sorted-h';
-  head.innerHTML = `<span>${total}</span>`;
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.textContent = 'Исходный вид';
-  closeBtn.addEventListener('click', () => removePublishSortedOverlay());
-  head.appendChild(closeBtn);
-  root.appendChild(head);
 
   const list = document.createElement('div');
   list.className = 'pixso-tuner-publish-sorted-list';
@@ -1302,6 +1282,7 @@ function renderPublishSortedOverlay(bundle) {
       cb.type = 'checkbox';
       cb.className = 'pixso-tuner-publish-sorted-cb';
       cb.checked = !!r.checked;
+      cb.disabled = !isLibraryPublishChangesSectionTitle(block.title);
       cb.setAttribute('aria-label', `Публикация: ${r.name}`);
       let syncingFromRemote = false;
       cb.addEventListener('change', (e) => {
@@ -1366,6 +1347,20 @@ function renderPublishSortedOverlay(bundle) {
   }
 }
 
+function getPublishScanToggleInput() {
+  const wrap = document.querySelector(`[${PUBLISH_SCAN_BTN_ATTR}]`);
+  if (!wrap) return null;
+  return wrap.querySelector('input.pixso-tuner-publish-scan-toggle-input');
+}
+
+function setPublishScanToggleChecked(checked) {
+  const inp = getPublishScanToggleInput();
+  if (inp instanceof HTMLInputElement) {
+    inp.checked = !!checked;
+    inp.setAttribute('aria-checked', inp.checked ? 'true' : 'false');
+  }
+}
+
 function removePublishScanButton() {
   const b = document.querySelector(`[${PUBLISH_SCAN_BTN_ATTR}]`);
   if (b) b.remove();
@@ -1378,32 +1373,64 @@ function ensurePublishScanButton(container) {
   const wrap = document.createElement('div');
   wrap.className = 'pixso-tuner-publish-scan-wrap';
   wrap.setAttribute(PUBLISH_SCAN_BTN_ATTR, '');
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'pixso-tuner-publish-scan-btn';
-  btn.textContent = 'Нормально покажи';
-  btn.addEventListener('click', async () => {
+  const label = document.createElement('label');
+  label.className = 'pixso-tuner-publish-scan-toggle';
+  const toggleInput = document.createElement('input');
+  toggleInput.type = 'checkbox';
+  toggleInput.className = 'pixso-tuner-publish-scan-toggle-input';
+  toggleInput.setAttribute('role', 'switch');
+  toggleInput.setAttribute('aria-label', 'Сортированный список публикации');
+  const track = document.createElement('span');
+  track.className = 'pixso-tuner-publish-scan-switch';
+  track.setAttribute('aria-hidden', 'true');
+  const knob = document.createElement('span');
+  knob.className = 'pixso-tuner-publish-scan-switch-knob';
+  track.appendChild(knob);
+  const text = document.createElement('span');
+  text.className = 'pixso-tuner-publish-scan-toggle-text';
+  text.textContent = 'Pumped-up view';
+  label.appendChild(toggleInput);
+  label.appendChild(track);
+  label.appendChild(text);
+
+  const syncSwitchAria = () => {
+    toggleInput.setAttribute('aria-checked', toggleInput.checked ? 'true' : 'false');
+  };
+  syncSwitchAria();
+  toggleInput.addEventListener('change', syncSwitchAria);
+
+  toggleInput.addEventListener('change', async () => {
+    if (!toggleInput.checked) {
+      removePublishSortedOverlay();
+      return;
+    }
     const wrappers = collectLibraryPublishWrappers();
     const w = wrappers[0];
-    if (!w) return;
-    btn.disabled = true;
-    const prev = btn.textContent;
-    btn.textContent = 'Сканирование…';
+    if (!w) {
+      setPublishScanToggleChecked(false);
+      return;
+    }
+    toggleInput.disabled = true;
+    const prevLabel = text.textContent;
+    text.textContent = 'Сканирование…';
     try {
       const rows = await scanLibraryPublishRowsViaScroll(w);
       renderPublishSortedOverlay(rows);
     } catch (_) {
-      btn.textContent = 'Ошибка';
-      setTimeout(() => {
-        btn.textContent = prev;
-        btn.disabled = false;
+      removePublishSortedOverlay();
+      setPublishScanToggleChecked(false);
+      text.textContent = 'Ошибка';
+      window.setTimeout(() => {
+        text.textContent = prevLabel;
       }, 1200);
       return;
+    } finally {
+      toggleInput.disabled = false;
+      if (toggleInput.checked) text.textContent = prevLabel;
     }
-    btn.textContent = prev;
-    btn.disabled = false;
   });
-  wrap.appendChild(btn);
+
+  wrap.appendChild(label);
   if (container.firstChild) {
     container.insertBefore(wrap, container.firstChild);
   } else {
@@ -1647,6 +1674,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 const EXPORT_PIX_ICON_STYLE_ID = 'pixso-tuner-export-pix-icon-style';
+/** Старый id стилей, скрывавших превью — удаляем узел, если остался после обновления расширения. */
 const PUBLISH_HIDE_IMAGE_BOX_STYLE_ID = 'pixso-tuner-hide-publish-li-image-box';
 
 /** Центрирование иконки 20×20 в зоне 32×32: у Pixso у .px-icon-button-icon/svg часто absolute — сбивает выравнивание */
@@ -1660,57 +1688,17 @@ function ensureExportPixIconStyles() {
   document.documentElement.appendChild(el);
 }
 
-/** Скрытие превью, сетка строк и высота — стиль перезаписываем целиком при обновлении расширения */
-function ensurePublishDetailLiImageBoxHidden() {
-  const id = PUBLISH_HIDE_IMAGE_BOX_STYLE_ID;
-  let el = document.getElementById(id);
-  if (!el) {
-    el = document.createElement('style');
-    el.id = id;
-    document.documentElement.appendChild(el);
-  }
-  el.textContent =
-    /** В разметке Pixso класс с префиксом publish--detail-- (два дефиса после publish), не publish-detail-- */
-    '.library-publish-container .publish--detail--li-image-box,' +
-    '.library-publish-container .publish-detail--li-image-box,' +
-    '.library-publish-container .publish--detail--li .publish--detail--li-image-box,' +
-    '.library-publish-container .publish--detail--li .publish-detail--li-image-box' +
-    '{display:none!important;visibility:hidden!important;width:0!important;height:0!important;min-width:0!important;min-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;flex:0 0 0!important;pointer-events:none!important}' +
-    '.library-publish-container .publish--detail--li{grid-template-columns:32px 1fr 50px!important;align-items:center!important;box-sizing:border-box!important;background:transparent!important}' +
-    '.library-publish-container .flex-align-center.px-checkbox{height:' +
-    LIBRARY_PUBLISH_ROW_HEIGHT_PX +
-    'px!important;min-height:' +
-    LIBRARY_PUBLISH_ROW_HEIGHT_PX +
-    'px!important;max-height:' +
-    LIBRARY_PUBLISH_ROW_HEIGHT_PX +
-    'px!important;box-sizing:border-box!important}' +
-    '.library-publish-container .wrapper .item{width:100%!important;position:absolute!important;left:0!important;right:0!important;border-radius:6px!important;box-sizing:border-box!important}' +
-    '.library-publish-container .wrapper .item:hover{background-color:var(--color-bg-hover,rgba(0,0,0,.06))!important}' +
-    '.library-publish-container .wrapper .item:has(.publish--detail--li:not(.publish--detail--li__title)){height:' +
-    LIBRARY_PUBLISH_ROW_HEIGHT_PX +
-    'px!important;min-height:' +
-    LIBRARY_PUBLISH_ROW_HEIGHT_PX +
-    'px!important;max-height:' +
-    LIBRARY_PUBLISH_ROW_HEIGHT_PX +
-    'px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;overflow:visible!important}' +
-    '.library-publish-container .wrapper .item:has(.publish--detail--li:not(.publish--detail--li__title)):hover{background:transparent!important}' +
-    '.library-publish-container .wrapper .item:has(.publish--detail--li:not(.publish--detail--li__title)):hover .publish--detail--li{background-color:var(--color-bg-hover,rgba(0,0,0,.06))!important;border-radius:6px!important}' +
-    '.library-publish-container .wrapper .item:has(.publish--detail--li:not(.publish--detail--li__title)) .publish--detail--li{margin:0!important;padding:0 8px 0 4px!important;height:100%!important;min-height:0!important;width:100%!important;box-sizing:border-box!important;border-radius:6px!important}' +
-    '.library-publish-container .wrapper .item:has(.publish--detail--li:not(.publish--detail--li__title)) .name.text__ellipsis,.library-publish-container .wrapper .item:has(.publish--detail--li:not(.publish--detail--li__title)) .name{line-height:18px!important;max-height:none!important;padding:0!important;margin:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}';
-  try {
-    collectLibraryPublishWrappers().forEach((w) => removePublishLiImageBoxNodes(w));
-  } catch (_) {
-    /* ignore */
-  }
+function removeLegacyPublishListOverrideStyles() {
+  const el = document.getElementById(PUBLISH_HIDE_IMAGE_BOX_STYLE_ID);
+  if (el) el.remove();
 }
 
 let libraryPublishCheckboxRefreshTimer = 0;
 let libraryPublishInteractionHooksInstalled = false;
 
-/** После клика по чекбоксу Vue перерисовывает список — стили + несколько проходов очистки превью */
+/** После клика по чекбоксу Vue перерисовывает список — добор проходов сортировки обёртки */
 function refreshLibraryPublishAfterListMutation() {
   clearPublishSortedActiveIfPanelMissing();
-  ensurePublishDetailLiImageBoxHidden();
   sortAllLibraryPublishWrappers();
   window.requestAnimationFrame(() => sortAllLibraryPublishWrappers());
   scheduleSortLibraryPublishModalForced();
@@ -1791,7 +1779,7 @@ async function init() {
   await loadFeatureFlags();
   ensureExportBridge();
   ensureExportPixIconStyles();
-  ensurePublishDetailLiImageBoxHidden();
+  removeLegacyPublishListOverrideStyles();
   ensureLibraryPublishInteractionHooks();
   onDomMutation();
   libraryPublishModalInDom = documentHasLibraryPublishModal();
