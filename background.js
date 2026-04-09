@@ -2,7 +2,9 @@ const AUTO_EXPORT_ALARM = 'pixso-tuner-auto-export';
 
 const RENAME_DEFAULTS = {
   renamePixDownloads: false,
-  pixDownloadFilenameTemplate: '{{date}} {{title}}.pix'
+  pixDownloadFilenameTemplate: '{{date}} {{title}}.pix',
+  autosaveFolderEnabled: true,
+  autosaveFolder: 'Pixso Backup'
 };
 
 /** Синхронный снимок настроек переименования — onDeterminingFilename требует один вызов suggest() синхронно */
@@ -19,15 +21,18 @@ const suggestAlreadyCalledForDownloadId = new Set();
 
 async function syncAutosaveAlarm() {
   const data = await chrome.storage.local.get({
-    autosaveEnabled: false,
-    autosaveIntervalMinutes: 10
+    autosaveIntervalMinutes: 5
   });
   await chrome.alarms.clear(AUTO_EXPORT_ALARM);
   await chrome.alarms.clear('pixso-tuner-autosave');
-  if (data.autosaveEnabled) {
-    const m = Math.min(120, Math.max(1, Number(data.autosaveIntervalMinutes) || 10));
-    chrome.alarms.create(AUTO_EXPORT_ALARM, { periodInMinutes: m });
-  }
+  const m = Math.min(120, Math.max(1, Number(data.autosaveIntervalMinutes) || 5));
+  chrome.alarms.create(AUTO_EXPORT_ALARM, { periodInMinutes: m });
+}
+
+function extractFileKeyFromUrl(url) {
+  if (typeof url !== 'string') return '';
+  const m = url.match(/\/design\/([^/?#]+)/i);
+  return m && m[1] ? m[1] : '';
 }
 
 function sanitizeStem(s) {
@@ -36,6 +41,21 @@ function sanitizeStem(s) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 180) || 'export';
+}
+
+function sanitizeFolderPath(folderPath) {
+  const raw = String(folderPath || '').trim();
+  if (!raw) return '';
+  const parts = raw
+    .split(/[\\/]+/)
+    .map((part) =>
+      String(part)
+        .replace(/[?%*:|"<>]/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim()
+    )
+    .filter((part) => !!part && part !== '.' && part !== '..');
+  return parts.join('/');
 }
 
 function formatDateStamp() {
@@ -80,19 +100,24 @@ chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
     return;
   }
 
-  if (!renameSettingsCache.renamePixDownloads) {
-    return;
-  }
   if (!isLikelyPixsoPixDownload(downloadItem)) {
     return;
   }
+  const folder = renameSettingsCache.autosaveFolderEnabled === false
+    ? ''
+    : sanitizeFolderPath(renameSettingsCache.autosaveFolder);
+  const needRename = renameSettingsCache.renamePixDownloads === true;
+  if (!needRename && !folder) return;
 
   suggestAlreadyCalledForDownloadId.add(id);
 
-  const filename = buildPixFilename(
-    renameSettingsCache.pixDownloadFilenameTemplate || RENAME_DEFAULTS.pixDownloadFilenameTemplate,
-    downloadItem
-  );
+  const baseFilename = needRename
+    ? buildPixFilename(
+        renameSettingsCache.pixDownloadFilenameTemplate || RENAME_DEFAULTS.pixDownloadFilenameTemplate,
+        downloadItem
+      )
+    : (downloadItem.filename || 'export.pix').split(/[/\\]/).pop() || 'export.pix';
+  const filename = folder ? `${folder}/${baseFilename}` : baseFilename;
 
   try {
     suggest({ filename, conflictAction: 'uniquify' });
@@ -130,10 +155,17 @@ chrome.storage.onChanged.addListener((_changes, area) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== AUTO_EXPORT_ALARM) return;
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     const tab = tabs[0];
     if (!tab?.id || !tab.url) return;
     if (!/^https:\/\/([^/]+\.)?pixso\.net\//.test(tab.url)) return;
+    const fileKey = extractFileKeyFromUrl(tab.url);
+    if (!fileKey) return;
+    const data = await chrome.storage.local.get({ autosaveByFile: {} });
+    const autosaveByFile = data && data.autosaveByFile && typeof data.autosaveByFile === 'object'
+      ? data.autosaveByFile
+      : {};
+    if (autosaveByFile[fileKey] !== true) return;
     chrome.tabs
       .sendMessage(tab.id, { type: 'pixso-tuner-auto-export-pix' })
       .catch(() => {});

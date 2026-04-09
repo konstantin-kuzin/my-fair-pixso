@@ -63,8 +63,8 @@
       }
       .hint {
         font-size: 0.8rem;
-        color: #555;
-        margin-top: 8px;
+        color: #999;
+        margin-top: 2px;
         line-height: 1.4;
       }
       .ok {
@@ -95,12 +95,6 @@
         Добавить на панель кнопку сохранения 
       </label>
       <label>
-        <input type="checkbox" id="enabled" />
-        Автосохранение в файл
-      </label>
-      <div id="intervalRow" class="row conditional-block">раз в <input type="number" id="interval" min="1" max="120" step="1" value="10" /> мин.
-      </div>
-      <label>
         <input type="checkbox" id="renamePix" />
         Шаблон имени сохраняемого файла
       </label>
@@ -114,6 +108,22 @@
         <p class="hint">
           <code>{{date}}</code>, <code>{{title}}</code>, <code>{{raw}}</code>
         </p>
+      </div>
+      <label>
+        <input type="checkbox" id="autosaveFolderEnabled" />
+        Директория для сохраняемых файлов
+      </label>
+      <div id="autosaveFolderBlock" class="row conditional-block">
+        <input
+          type="text"
+          id="autosaveFolder"
+          spellcheck="false"
+          placeholder="Pixso Backup"
+        />
+        <p class="hint">Подпапка внутри папки Downloads</p>
+      </div>
+      <div class="row">
+        Интервал автосохранения <input type="number" id="interval" min="1" max="120" step="1" value="5" /> мин.
       </div>
       <button type="button" id="save">Сохранить</button>
       <span class="ok" id="status" style="margin-left: 1em;"></span>

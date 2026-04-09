@@ -51,6 +51,38 @@
     } catch (_) {}
   }
 
+  function clickExportFileMenuNode(row) {
+    if (!row || !row.getBoundingClientRect) return;
+    if (row.closest && row.closest('.px-cascader-item__disabled')) return;
+    const rect = row.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const o = { bubbles: true, cancelable: true, clientX: cx, clientY: cy, view: window };
+    const p = {
+      bubbles: true,
+      cancelable: true,
+      clientX: cx,
+      clientY: cy,
+      pointerId: 1,
+      pointerType: 'mouse',
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      view: window
+    };
+    try {
+      row.dispatchEvent(new PointerEvent('pointerdown', p));
+      row.dispatchEvent(new MouseEvent('mousedown', o));
+      row.dispatchEvent(new PointerEvent('pointerup', { ...p, buttons: 0 }));
+      row.dispatchEvent(new MouseEvent('mouseup', o));
+      row.dispatchEvent(new MouseEvent('click', o));
+    } catch (_) {
+      row.dispatchEvent(new MouseEvent('click', o));
+    }
+    if (typeof row.click === 'function') row.click();
+  }
+
   function clickExportPixNode(node) {
     if (!node || !node.getBoundingClientRect) return;
     if (node.closest && node.closest('.px-cascader-item__disabled')) return;
@@ -92,6 +124,11 @@
   function runHoverExportFileMenu() {
     const row = deepQuery('[command="export_file_menu"]', document.documentElement);
     if (row) hoverExportFileMenuNode(row);
+  }
+
+  function runClickExportFileMenu() {
+    const row = deepQuery('[command="export_file_menu"]', document.documentElement);
+    if (row) clickExportFileMenuNode(row);
   }
 
   /** Селектор с обходом open shadow (чекбоксы Publish могут быть внутри shadow). */
@@ -200,6 +237,7 @@
       } catch (_) {}
       if (ev.data.action === 'click-export-pix') runClickExportPix();
       if (ev.data.action === 'hover-export-file-menu') runHoverExportFileMenu();
+      if (ev.data.action === 'click-export-file-menu') runClickExportFileMenu();
       if (ev.data.action === 'click-publish-checkbox') runClickPublishCheckbox(ev.data.token);
     },
     false
