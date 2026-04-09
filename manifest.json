@@ -23,7 +23,7 @@
     },
     "web_accessible_resources": [
       {
-        "resources": ["export.js"],
+        "resources": ["export.js", "doc-tab.html", "links.json"],
         "matches": ["https://pixso.net/*", "https://*.pixso.net/*"]
       }
     ],

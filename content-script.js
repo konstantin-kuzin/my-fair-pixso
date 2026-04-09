@@ -37,16 +37,228 @@ function removePinnedPluginItems(root = document) {
 
 let trimPluginsListEnabled = true;
 let exportPixButtonEnabled = true;
+let docPanelEnabled = true;
 let autosaveFileKey = '';
 let autosaveEnabledForFile = false;
+let docPanelHtmlCache = '';
+let docPagesCache = null;
 
 async function loadFeatureFlags() {
   const d = await chrome.storage.local.get({
     trimPluginsListEnabled: true,
-    exportPixButtonEnabled: true
+    exportPixButtonEnabled: true,
+    docPanelEnabled: true
   });
   trimPluginsListEnabled = d.trimPluginsListEnabled !== false;
   exportPixButtonEnabled = d.exportPixButtonEnabled !== false;
+  docPanelEnabled = d.docPanelEnabled !== false;
+}
+
+function ensureDocTab() {
+  const tabHeader = document.querySelector('.right-panel--tab-bar--header');
+  if (!(tabHeader instanceof Element)) return;
+
+  if (!docPanelEnabled) {
+    deactivateDocTab();
+    const injectedTab = tabHeader.querySelector('[data-pixso-tuner="doc-tab"]');
+    if (injectedTab instanceof HTMLElement) injectedTab.remove();
+    const panel = document.querySelector(
+      '.el-scrollbar.right-panel--scroller--design[data-pixso-tuner="doc-panel"]'
+    );
+    if (panel instanceof HTMLElement) panel.remove();
+    return;
+  }
+
+  let injectedTab = tabHeader.querySelector('[data-pixso-tuner="doc-tab"]');
+  if (!(injectedTab instanceof HTMLElement)) {
+    const hasNativeDoc = Array.from(
+      tabHeader.querySelectorAll('.right-panel--tab-item')
+    ).some((tab) => {
+      if (!(tab instanceof Element)) return false;
+      const onboarding = (tab.getAttribute('onboarding-step') || '').trim().toUpperCase();
+      const text = (tab.textContent || '').replace(/\s+/g, ' ').trim().toUpperCase();
+      return onboarding === 'DOC' || text === 'DOC';
+    });
+    if (hasNativeDoc) return;
+
+    const tab = document.createElement('div');
+    tab.className = 'right-panel--tab-item flx__center';
+    tab.setAttribute('onboarding-step', 'DOC');
+    tab.setAttribute('data-pixso-tuner', 'doc-tab');
+    tab.textContent = ' DOC ';
+    tabHeader.appendChild(tab);
+    injectedTab = tab;
+  }
+
+  if (tabHeader.getAttribute('data-pixso-tuner-doc-bound') === '1') return;
+  tabHeader.setAttribute('data-pixso-tuner-doc-bound', '1');
+  tabHeader.addEventListener('click', (ev) => {
+    const target = ev.target instanceof Element ? ev.target.closest('.right-panel--tab-item') : null;
+    if (!(target instanceof HTMLElement)) return;
+    const isDocTab = target.getAttribute('data-pixso-tuner') === 'doc-tab';
+    if (isDocTab) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      void activateDocTab();
+      return;
+    }
+    deactivateDocTab();
+  });
+}
+
+function getNativeRightPanelScroller() {
+  const all = document.querySelectorAll('.el-scrollbar.right-panel--scroller--design');
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    if (!(el instanceof HTMLElement)) continue;
+    if (el.getAttribute('data-pixso-tuner') === 'doc-panel') continue;
+    return el;
+  }
+  return null;
+}
+
+function getOrCreateDocPanel() {
+  let panel = document.querySelector(
+    '.el-scrollbar.right-panel--scroller--design[data-pixso-tuner="doc-panel"]'
+  );
+  if (panel instanceof HTMLElement) return panel;
+
+  const nativeScroller = getNativeRightPanelScroller();
+  if (!(nativeScroller instanceof HTMLElement) || !nativeScroller.parentElement) return null;
+
+  panel = document.createElement('div');
+  panel.className = 'el-scrollbar right-panel--scroller--design pixso-tuner-doc-panel';
+  panel.setAttribute('data-pixso-tuner', 'doc-panel');
+  panel.style.display = 'none';
+  if (nativeScroller.getAttribute('style')) {
+    panel.setAttribute('style', `${nativeScroller.getAttribute('style')};display:none;`);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'el-scrollbar__wrap el-scrollbar__wrap--hidden-default';
+  const view = document.createElement('div');
+  view.className = 'el-scrollbar__view';
+  view.style.height = '100%';
+  view.style.minHeight = '100%';
+  view.style.overflowX = 'hidden';
+  view.style.padding = '16px';
+  view.style.boxSizing = 'border-box';
+  view.style.color = 'var(--color-text-primary, #1f1f1f)';
+  view.innerHTML = '<div>Loading DOC...</div>';
+  wrap.appendChild(view);
+  panel.appendChild(wrap);
+  nativeScroller.parentElement.insertBefore(panel, nativeScroller.nextSibling);
+  return panel;
+}
+
+async function loadDocPanelHtml() {
+  if (docPanelHtmlCache) return docPanelHtmlCache;
+  try {
+    const url = chrome.runtime.getURL('doc-tab.html');
+    const response = await fetch(url, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    docPanelHtmlCache = await response.text();
+  } catch (_) {
+    docPanelHtmlCache = '<h2>DOC</h2><p>hello world</p>';
+  }
+  return docPanelHtmlCache;
+}
+
+async function loadDocPages() {
+  if (Array.isArray(docPagesCache)) return docPagesCache;
+  try {
+    const url = chrome.runtime.getURL('links.json');
+    const response = await fetch(url, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error('Invalid doc pages format');
+    docPagesCache = data
+      .filter(
+        (item) =>
+          item &&
+          typeof item === 'object' &&
+          typeof item.name === 'string' &&
+          typeof item.url === 'string' &&
+          item.name.trim() &&
+          item.url.trim()
+      )
+      .map((item) => ({ name: item.name.trim(), url: item.url.trim() }))
+      .sort((a, b) => a.name.localeCompare(b.name, ['ru', 'en'], { sensitivity: 'base' }));
+  } catch (_) {
+    docPagesCache = [];
+  }
+  return docPagesCache;
+}
+
+function renderDocPages(view, pages) {
+  if (!(view instanceof HTMLElement)) return;
+  const host = view.querySelector('[data-pixso-tuner="doc-list-host"]');
+  if (!(host instanceof HTMLElement)) return;
+  if (!Array.isArray(pages) || pages.length === 0) {
+    host.innerHTML = '<p style="margin:0;">Не удалось загрузить список страниц.</p>';
+    return;
+  }
+  const listHtml = pages
+    .map(
+      (item) =>
+        `<li style="margin: 0 0 6px;"><a style="text-decoration: none;" href="${item.url}" target="_blank" rel="noopener noreferrer">${item.name}</a></li>`
+    )
+    .join('');
+  host.innerHTML = `
+    <style>
+      [data-pixso-tuner="doc-list-host"] a:hover {
+        text-decoration: underline dotted;
+      }
+    </style>
+    <ul style="margin: 0; padding-left: 20px;">${listHtml}</ul>
+  `;
+}
+
+function setDocTabActiveState(active) {
+  const tabHeader = document.querySelector('.right-panel--tab-bar--header');
+  if (!(tabHeader instanceof Element)) return;
+  const docTab = tabHeader.querySelector('[data-pixso-tuner="doc-tab"]');
+  if (!(docTab instanceof HTMLElement)) return;
+  if (active) {
+    tabHeader
+      .querySelectorAll('.right-panel--tab-item__active')
+      .forEach((el) => el.classList.remove('right-panel--tab-item__active'));
+    docTab.classList.add('right-panel--tab-item__active');
+  } else {
+    docTab.classList.remove('right-panel--tab-item__active');
+  }
+}
+
+function deactivateDocTab() {
+  const nativeScroller = getNativeRightPanelScroller();
+  const docPanel = document.querySelector(
+    '.el-scrollbar.right-panel--scroller--design[data-pixso-tuner="doc-panel"]'
+  );
+  if (nativeScroller instanceof HTMLElement) nativeScroller.style.removeProperty('display');
+  if (docPanel instanceof HTMLElement) docPanel.style.display = 'none';
+  setDocTabActiveState(false);
+}
+
+async function activateDocTab() {
+  const nativeScroller = getNativeRightPanelScroller();
+  const docPanel = getOrCreateDocPanel();
+  if (!(docPanel instanceof HTMLElement)) return;
+
+  const nativeStyle = nativeScroller instanceof HTMLElement ? nativeScroller.getAttribute('style') : '';
+  if (nativeStyle) {
+    docPanel.setAttribute('style', `${nativeStyle};display:block;`);
+  } else {
+    docPanel.style.display = 'block';
+  }
+
+  if (nativeScroller instanceof HTMLElement) nativeScroller.style.display = 'none';
+  setDocTabActiveState(true);
+
+  const view = docPanel.querySelector('.el-scrollbar__view');
+  if (!(view instanceof HTMLElement)) return;
+  const [html, pages] = await Promise.all([loadDocPanelHtml(), loadDocPages()]);
+  view.innerHTML = html;
+  renderDocPages(view, pages);
 }
 
 function extractFileKeyFromUrl(url) {
@@ -1906,6 +2118,7 @@ function onDomMutation() {
     removePinnedPluginItems();
   }
   ensureExportPixButton();
+  ensureDocTab();
   void refreshAutosaveStateFromStorage(false);
 }
 
@@ -2055,7 +2268,9 @@ async function init() {
     if (changes.autosaveByFile) {
       void refreshAutosaveStateFromStorage(true);
     }
-    if (!changes.trimPluginsListEnabled && !changes.exportPixButtonEnabled) return;
+    if (!changes.trimPluginsListEnabled && !changes.exportPixButtonEnabled && !changes.docPanelEnabled) {
+      return;
+    }
     void loadFeatureFlags().then(() => onDomMutation());
   });
 

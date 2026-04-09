@@ -5,7 +5,8 @@ const DEFAULTS = {
   autosaveFolderEnabled: true,
   autosaveFolder: 'Pixso Backup',
   trimPluginsListEnabled: true,
-  exportPixButtonEnabled: true
+  exportPixButtonEnabled: true,
+  docPanelEnabled: true
 };
 
 const intervalEl = document.getElementById('interval');
@@ -15,6 +16,7 @@ const autosaveFolderEnabledEl = document.getElementById('autosaveFolderEnabled')
 const autosaveFolderEl = document.getElementById('autosaveFolder');
 const trimPluginsEl = document.getElementById('trimPlugins');
 const exportPixButtonEl = document.getElementById('exportPixButton');
+const docPanelEnabledEl = document.getElementById('docPanelEnabled');
 const saveBtn = document.getElementById('save');
 const statusEl = document.getElementById('status');
 const intervalRow = document.getElementById('intervalRow');
@@ -42,6 +44,7 @@ async function load() {
   if (autosaveFolderEl) autosaveFolderEl.value = data.autosaveFolder || DEFAULTS.autosaveFolder;
   if (trimPluginsEl) trimPluginsEl.checked = data.trimPluginsListEnabled !== false;
   if (exportPixButtonEl) exportPixButtonEl.checked = data.exportPixButtonEnabled !== false;
+  if (docPanelEnabledEl) docPanelEnabledEl.checked = data.docPanelEnabled !== false;
   updateConditionalVisibility();
 }
 
@@ -69,7 +72,10 @@ async function save() {
       : DEFAULTS.trimPluginsListEnabled,
     exportPixButtonEnabled: exportPixButtonEl
       ? exportPixButtonEl.checked
-      : DEFAULTS.exportPixButtonEnabled
+      : DEFAULTS.exportPixButtonEnabled,
+    docPanelEnabled: docPanelEnabledEl
+      ? docPanelEnabledEl.checked
+      : DEFAULTS.docPanelEnabled
   };
 
   await chrome.storage.local.set(payload);
