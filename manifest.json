@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "My Fair Pixso",
-    "version": "1.8",
+    "version": "1.9",
     "description": "Тюнинг Pixso: бекап, сортировка при публикации, вкладка с документацией",
     "permissions": ["storage", "alarms", "downloads"],
     "background": {
