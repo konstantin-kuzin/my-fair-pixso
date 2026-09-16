@@ -4,7 +4,7 @@ const USER_PLUGINS_WRAP =
 const EXPORT_PIX_SEL = '[command="export_pix"]';
 const EXPORT_FILE_MENU_SEL = '[command="export_file_menu"]';
 
-/** Классы вида plugin-dropdown-li-N-user, где N от 0 до 8 включительно */
+/** Классы вида plugin-dropdown-li-N-user, где N от 0 до 7 включительно */
 function isTargetPluginRow(el) {
   if (!(el instanceof Element)) return false;
   if (!el.classList.contains('plugin-item')) return false;
@@ -12,7 +12,7 @@ function isTargetPluginRow(el) {
     const m = c.match(/^plugin-dropdown-li-(\d+)-user$/);
     if (m) {
       const n = Number(m[1], 10);
-      return n >= 0 && n <= 8;
+      return n >= 0 && n <= 7;
     }
   }
   return false;
@@ -912,10 +912,16 @@ const PUBLISH_SORTED_INLINE_ID = 'pixso-tuner-publish-sorted-inline';
 const PUBLISH_SORTED_LEGACY_OVERLAY_ID = 'pixso-tuner-publish-sorted-overlay';
 const PUBLISH_SORTED_HOST_CLASS = 'pixso-tuner-publish-sorted-host';
 const PUBLISH_SCAN_BTN_ATTR = 'data-pixso-tuner-publish-scan';
+const PUBLISH_SEARCH_ATTR = 'data-pixso-tuner-publish-search';
+let publishSortedSearchQuery = '';
 
 function getLibraryPublishScrollElement(container) {
   if (!(container instanceof Element)) return null;
+  // Новый UI Pixso: скролл живёт в el-scrollbar__wrap (а не в legacy .container)
   return (
+    container.querySelector('.el-scrollbar.publish-change-panel-scrollbar .el-scrollbar__wrap') ||
+    container.querySelector('.el-scrollbar__wrap.el-scrollbar__wrap--hidden-default') ||
+    container.querySelector('.el-scrollbar__wrap') ||
     container.querySelector('.container.scrollbar-s') ||
     container.querySelector('.container') ||
     container
@@ -958,6 +964,7 @@ function isLibraryPublishChangesSectionTitle(title) {
  * Заголовок секции Changes / Unchanged / Hide.
  * В Pixso группа — .item с header.publish-detail-header + .t-title-12 (не publish--detail--li__title:
  * тот класс у подписи колонки «Component»).
+ * При наличии нескольких .t-title-12 берём первый (название секции, без счётчика).
  */
 function extractPublishSectionTitleFromItem(item) {
   if (!(item instanceof Element)) return null;
@@ -965,8 +972,18 @@ function extractPublishSectionTitleFromItem(item) {
     item.querySelector('header.publish-detail-header') ||
     item.querySelector('.publish-detail-header');
   if (hdr) {
-    const titleEl = hdr.querySelector('.t-title-12') || hdr;
-    const text = titleEl.textContent.replace(/\u200b/g, '').trim();
+    // Ищем первый .t-title-12 в контексте заголовка, не consideraя счётчик (87/87)
+    const titleSpans = hdr.querySelectorAll('.t-title-12');
+    for (let i = 0; i < titleSpans.length; i++) {
+      const span = titleSpans[i];
+      const text = (span.textContent || '').replace(/\u200b/g, '').trim();
+      // Пропускаем счётчик в скобках
+      if (/^\s*\(\s*\d+\s*\/\s*\d+\s*\)\s*$/.test(text)) continue;
+      const g = normalizePublishGroupTitle(text);
+      if (g) return g;
+    }
+    // Fallback: если ничего не нашли в spans, берём весь текст header
+    const text = hdr.textContent.replace(/\u200b/g, '').trim();
     const g = normalizePublishGroupTitle(text);
     if (g) return g;
   }
@@ -1158,18 +1175,41 @@ function ingestPublishRecordsFromSnapshot(wrapper, recordMap) {
 }
 
 function finalizePublishGroupsFromRecords(recordMap) {
-  const list = [...recordMap.values()].sort((a, b) => {
-    if (a.top !== b.top) return a.top - b.top;
-    if (a.kind !== b.kind) return a.kind === 'section' ? -1 : 1;
-    return 0;
-  });
   const groupsMap = new Map();
-  let currentGroup = 'Changes';
-  for (let i = 0; i < list.length; i++) {
-    const rec = list[i];
+  const headersByGroup = new Map();
+  const rows = [];
+
+  for (const rec of recordMap.values()) {
     if (rec.kind === 'section') {
-      currentGroup = rec.group;
+      const prevTop = headersByGroup.get(rec.group);
+      if (typeof prevTop !== 'number' || rec.top < prevTop) {
+        headersByGroup.set(rec.group, rec.top);
+      }
       continue;
+    }
+    rows.push(rec);
+  }
+
+  if (!headersByGroup.has('Changes')) {
+    headersByGroup.set('Changes', 0);
+  }
+
+  const sortedHeaders = [...headersByGroup.entries()]
+    .map(([group, top]) => ({ group, top }))
+    .sort((a, b) => a.top - b.top);
+
+  rows.sort((a, b) => a.top - b.top);
+
+  for (let i = 0; i < rows.length; i++) {
+    const rec = rows[i];
+    let currentGroup = 'Changes';
+    for (let hi = 0; hi < sortedHeaders.length; hi++) {
+      const hdr = sortedHeaders[hi];
+      if (rec.top >= hdr.top) {
+        currentGroup = hdr.group;
+      } else {
+        break;
+      }
     }
     mergePublishRowIntoGroup(groupsMap, currentGroup, {
       ...rec.row,
@@ -1291,10 +1331,19 @@ function ensurePublishSortedOverlayStyles() {
     '.pixso-tuner-publish-sorted-row{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;padding:4px 8px 4px 16px;}' +
     '.pixso-tuner-publish-sorted-cb{width:12px;height:12px;margin:0;cursor:pointer;flex-shrink:0}' +
     '.pixso-tuner-publish-sorted-cb:disabled{opacity:.45;cursor:not-allowed}' +
-    '.pixso-tuner-publish-sorted-sec{font-size:12px;font-weight:600;padding:6px 16px;color:rgba(0,0,0,.55);}' +
+    '.pixso-tuner-publish-sorted-sec{display:flex;align-items:center;gap:8px;padding:6px 16px;color:var(--color-text-primary);font-size:12px;line-height:20px;font-weight:var(--font-weight-medium);}' +
+    '.pixso-tuner-publish-sorted-sec-cb{width:12px;height:12px;margin:0;cursor:pointer;flex-shrink:0}' +
+    '.pixso-tuner-publish-sorted-sec-title{display:inline-flex;align-items:baseline;gap:4px;min-width:0;color:var(--color-text-primary);font-size:12px;line-height:20px;font-weight:var(--font-weight-medium)}' +
+    '.pixso-tuner-publish-sorted-sec-meta{color:var(--color-text-primary);font-size:12px;line-height:20px;font-weight:var(--font-weight-medium)}' +
     '.pixso-tuner-publish-sorted-st{font-size:12px;opacity:.65;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     '.pixso-tuner-publish-sorted-name{display:inline-flex;align-items:center;gap:4px;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}' +
     '.pixso-tuner-publish-sorted-name svg,.pixso-tuner-publish-sorted-name img{flex-shrink:0}' +
+    '.library-publish-container .publish--change--header{display:flex!important;align-items:flex-start!important;justify-content:space-between!important;gap:12px!important}' +
+    '.library-publish-container .publish--change--header .left{min-width:0!important;flex:1 1 auto!important}' +
+    '.library-publish-container .pixso-tuner-publish-search-wrap{display:flex!important;align-items:center!important;justify-content:flex-end!important;flex:0 0 220px!important;max-width:220px!important;padding-top:2px!important}' +
+    '.library-publish-container .pixso-tuner-publish-search{width:100%!important;height:32px!important;box-sizing:border-box!important;border:1px solid rgba(0,0,0,.12)!important;border-radius:8px!important;padding:0 10px!important;font:inherit!important;font-size:12px!important;line-height:20px!important;color:var(--color-text-primary)!important;background:var(--color-bg, #fff)!important;outline:none!important}' +
+    '.library-publish-container .pixso-tuner-publish-search::placeholder{color:rgba(0,0,0,.4)!important}' +
+    '.library-publish-container .pixso-tuner-publish-search:focus{border-color:var(--color-bg-switch-brand-normal)!important;box-shadow:0 0 0 2px rgba(51,102,255,.12)!important}' +
     '.library-publish-container .pixso-tuner-publish-scan-wrap{display:flex!important;align-items:center!important;padding:8px 16px 8px!important;box-sizing:border-box!important}' +
     '.library-publish-container .pixso-tuner-publish-scan-toggle{display:inline-flex!important;align-items:center!important;gap:8px!important;cursor:pointer!important;font:inherit!important;font-size:12px!important;color:inherit!important;user-select:none!important;margin:0!important;position:relative!important;box-sizing:border-box!important}' +
     '.library-publish-container .pixso-tuner-publish-scan-wrap input.pixso-tuner-publish-scan-toggle-input[type=checkbox]{' +
@@ -1343,8 +1392,8 @@ function attachPublishSortedOverlayScrollIsolation(root, scrollListEl) {
 }
 
 /**
- * Среди смонтированных .item ищет строку по имени. Несколько совпадений —
- * ближайший style.top к listTopHint из скана.
+ * Среди смонтированных .item ищет строку по имени или заголовок секции (Changes/Unchanged/Hide).
+ * Несколько совпадений — ближайший style.top к listTopHint из скана.
  */
 function findPublishRowItemForName(wrapper, name, listTopHint) {
   if (!(wrapper instanceof Element) || !name) return null;
@@ -1354,6 +1403,24 @@ function findPublishRowItemForName(wrapper, name, listTopHint) {
     (el) => el.classList && el.classList.contains('item')
   );
   const candidates = [];
+  
+  // Сначала проверяем, является ли name заголовком секции (Changes/Unchanged/Hide)
+  const normalizedName = normalizePublishGroupTitle(name);
+  if (normalizedName && LIBRARY_PUBLISH_GROUP_ORDER.includes(normalizedName)) {
+    for (let i = 0; i < children.length; i++) {
+      const item = children[i];
+      const sectionTitle = extractPublishSectionTitleFromItem(item);
+      if (!sectionTitle || sectionTitle !== normalizedName) continue;
+      const input =
+        item.querySelector('input.px-checkbox--input') ||
+        item.querySelector('input[type="checkbox"]');
+      if (!input) continue;
+      const topPx = parsePublishItemTopPx(item, wrapper);
+      return item; // Возвращаем сразу, заголовок уникален
+    }
+  }
+  
+  // Иначе ищем обычную строку с таким именем
   for (let i = 0; i < children.length; i++) {
     const item = children[i];
     const row = extractPublishRowFromItem(item);
@@ -1588,6 +1655,30 @@ function clearPublishSortedActiveIfPanelMissing() {
   }
 }
 
+function getPublishSortedMasterCheckbox() {
+  const panel = getPublishSortedInlinePanel();
+  if (!(panel instanceof Element)) return null;
+  const inp = panel.querySelector(
+    'input.pixso-tuner-publish-sorted-sec-cb[type="checkbox"]'
+  );
+  return inp instanceof HTMLInputElement ? inp : null;
+}
+
+function normalizePublishSearchQuery(value) {
+  return normalizePublishComponentName(String(value || '')).toLocaleLowerCase();
+}
+
+function applyPublishSortedSearchFilter(root) {
+  if (!(root instanceof Element)) return;
+  const query = normalizePublishSearchQuery(publishSortedSearchQuery);
+  const rows = root.querySelectorAll('.pixso-tuner-publish-sorted-row');
+  rows.forEach((row) => {
+    const haystack = normalizePublishSearchQuery(row.getAttribute('data-search-text') || '');
+    const visible = !query || haystack.includes(query);
+    row.style.display = visible ? '' : 'none';
+  });
+}
+
 /**
  * document.getElementById не находит узлы внутри open shadow — панель вставляется в scroll внутри модалки.
  */
@@ -1598,38 +1689,78 @@ function getPublishSortedInlinePanel() {
   );
 }
 
-/**
- * При всплытии из shadow event.target может быть retarget на host — ищем input в composedPath().
- */
-function resolveFooterGroupCheckboxInputFromEvent(e) {
-  if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') {
-    const box = e.target.closest('.library-publish-container_checkbox');
-    if (box && closestLibraryPublishContainer(e.target)) {
-      return e.target;
-    }
+function isPublishMasterCheckboxInput(input) {
+  if (!(input instanceof HTMLInputElement) || input.type !== 'checkbox') {
+    return false;
   }
-  const path =
-    typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
-  for (let i = 0; i < path.length; i++) {
-    const node = path[i];
-    if (!(node instanceof Element)) continue;
-    const box = node.closest('.library-publish-container_checkbox');
-    if (!box) continue;
-    if (!closestLibraryPublishContainer(node)) continue;
-    const inp =
-      box.querySelector('input.px-checkbox--input[type="checkbox"]') ||
-      box.querySelector('input[type="checkbox"]');
+  if (!closestLibraryPublishContainer(input)) return false;
+  const item = input.closest('.item');
+  if (!(item instanceof Element)) return false;
+  return extractPublishSectionTitleFromItem(item) === 'Changes';
+}
+
+function findPublishMasterCheckboxInputInNode(node) {
+  if (!(node instanceof Element)) return null;
+  if (node instanceof HTMLInputElement && isPublishMasterCheckboxInput(node)) {
+    return node;
+  }
+  const item = node.closest('.item');
+  if (!(item instanceof Element)) return null;
+  if (extractPublishSectionTitleFromItem(item) !== 'Changes') return null;
+  const itemInp = item.querySelector(
+    'input.px-checkbox--input[type="checkbox"], input[type="checkbox"]'
+  );
+  if (itemInp instanceof HTMLInputElement && isPublishMasterCheckboxInput(itemInp)) {
+    return itemInp;
+  }
+  return null;
+}
+
+function getNativePublishMasterCheckbox() {
+  const wrappers = collectLibraryPublishWrappers();
+  const wrapper = wrappers[0];
+  if (!(wrapper instanceof Element)) return null;
+  const items = [...wrapper.children].filter(
+    (el) => el.classList && el.classList.contains('item')
+  );
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (extractPublishSectionTitleFromItem(item) !== 'Changes') continue;
+    const inp = item.querySelector(
+      'input.px-checkbox--input[type="checkbox"], input[type="checkbox"]'
+    );
     if (inp instanceof HTMLInputElement) return inp;
   }
   return null;
 }
 
-/** Синхронизация с футерным групповым чекбоксом (148/148): без вызова toggle на каждую строку */
+/**
+ * При всплытии из shadow event.target может быть retarget на host — ищем master checkbox
+ * в composedPath() внутри актуального заголовка секции Changes.
+ */
+function resolvePublishMasterCheckboxInputFromEvent(e) {
+  if (e.target instanceof HTMLInputElement && isPublishMasterCheckboxInput(e.target)) {
+    return e.target;
+  }
+  const path =
+    typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+  for (let i = 0; i < path.length; i++) {
+    const inp = findPublishMasterCheckboxInputInNode(path[i]);
+    if (inp) return inp;
+  }
+  return null;
+}
+
+/** Локальная синхронизация чекбоксов в pumped-up overlay без изменения других секций. */
 function setPublishSortedCheckboxesAll(wantChecked) {
   const panel = getPublishSortedInlinePanel();
   if (!panel) return;
   publishSortedBulkSyncFromMaster = true;
   try {
+    const master = getPublishSortedMasterCheckbox();
+    if (master && !master.disabled) {
+      master.checked = wantChecked;
+    }
     panel
       .querySelectorAll('input.pixso-tuner-publish-sorted-cb[type="checkbox"]')
       .forEach((inp) => {
@@ -1642,48 +1773,25 @@ function setPublishSortedCheckboxesAll(wantChecked) {
   }
 }
 
-/**
- * Модалка открыта и либо панель на месте, либо «зависший» active без узла (Vue снял #inline при скролле скана).
- */
-function publishSortedFooterRescanStillNeeded() {
-  if (!documentHasLibraryPublishModal()) return false;
-  if (getPublishSortedInlinePanel()) return true;
-  return !!querySelectorDeep(
-    document.documentElement,
-    '.library-publish-container.pixso-tuner-publish-sorted-active'
+async function togglePublishSortedChangesRows(rows, wantChecked) {
+  const list = Array.isArray(rows) ? rows : [];
+  const targets = list.filter(
+    (row) =>
+      row &&
+      typeof row.name === 'string' &&
+      row.name &&
+      !!row.checked !== wantChecked
   );
-}
-
-/**
- * Групповой чекбокс обновляет только виртуальный список Vue — данные оверлея из прошлого скана устаревают.
- * Тот же проход, что у кнопки «Нормально покажи»: скролл + ingest + render.
- */
-function schedulePublishSortedOverlayFullRescanFromFooter() {
-  if (!getPublishSortedInlinePanel()) return;
-  const wrappers = collectLibraryPublishWrappers();
-  const w = wrappers[0];
-  if (!w) return;
-  if (publishSortedFooterRescanTimer) {
-    window.clearTimeout(publishSortedFooterRescanTimer);
+  for (let i = 0; i < targets.length; i++) {
+    const row = targets[i];
+    const ok = await togglePublishModalCheckboxByName(
+      row.name,
+      row.listTop,
+      wantChecked
+    );
+    if (!ok) return false;
   }
-  publishSortedFooterRescanTimer = window.setTimeout(() => {
-    publishSortedFooterRescanTimer = 0;
-    if (!publishSortedFooterRescanStillNeeded()) return;
-    const w2 = collectLibraryPublishWrappers()[0];
-    if (!w2) {
-      clearPublishSortedActiveClass();
-      return;
-    }
-    void (async () => {
-      try {
-        const bundle = await scanLibraryPublishRowsViaScroll(w2);
-        if (!documentHasLibraryPublishModal()) return;
-        renderPublishSortedOverlay(bundle);
-      } catch (_) {
-        clearPublishSortedActiveClass();
-      }
-    })();
-  }, 120);
+  return true;
 }
 
 function removePublishSortedOverlay() {
@@ -1716,17 +1824,96 @@ function renderPublishSortedOverlay(bundle) {
 
   const list = document.createElement('div');
   list.className = 'pixso-tuner-publish-sorted-list';
+  const getSectionSelectedCount = (rows) =>
+    rows.reduce((acc, row) => acc + (row && row.checked ? 1 : 0), 0);
+  const updateSectionHeaderState = (state) => {
+    if (!state) return;
+    const total = state.rows.length;
+    const selected = getSectionSelectedCount(state.rows);
+    if (state.masterCheckbox) {
+      state.masterCheckbox.checked = total > 0 && selected === total;
+      state.masterCheckbox.indeterminate = selected > 0 && selected < total;
+    }
+    if (state.metaEl) {
+      state.metaEl.textContent = `(${selected}/${total})`;
+    }
+  };
   for (let s = 0; s < sections.length; s++) {
     const block = sections[s];
+    const rows = block.rows || [];
+    const sectionState = {
+      rows,
+      masterCheckbox: null,
+      metaEl: null
+    };
     const secEl = document.createElement('div');
     secEl.className = 'pixso-tuner-publish-sorted-sec';
-    secEl.textContent = block.title;
+    if (isLibraryPublishChangesSectionTitle(block.title)) {
+      const secCb = document.createElement('input');
+      secCb.type = 'checkbox';
+      secCb.className = 'pixso-tuner-publish-sorted-sec-cb';
+      secCb.setAttribute('aria-label', 'Публикация: Changes');
+      sectionState.masterCheckbox = secCb;
+      let syncingFromRemote = false;
+      secCb.addEventListener('change', (e) => {
+        e.stopPropagation();
+        if (publishSortedBulkSyncFromMaster) return;
+        if (syncingFromRemote) return;
+        const wantChecked = secCb.checked;
+        rows.forEach((row) => {
+          row.checked = wantChecked;
+        });
+        setPublishSortedCheckboxesAll(wantChecked);
+        updateSectionHeaderState(sectionState);
+        void togglePublishSortedChangesRows(rows, wantChecked)
+          .then((ok) => {
+            if (!ok) {
+              syncingFromRemote = true;
+              rows.forEach((row) => {
+                row.checked = !wantChecked;
+              });
+              secCb.checked = !wantChecked;
+              setPublishSortedCheckboxesAll(!wantChecked);
+              updateSectionHeaderState(sectionState);
+              queueMicrotask(() => {
+                syncingFromRemote = false;
+              });
+              return;
+            }
+          })
+          .catch(() => {
+            syncingFromRemote = true;
+            rows.forEach((row) => {
+              row.checked = !wantChecked;
+            });
+            secCb.checked = !wantChecked;
+            setPublishSortedCheckboxesAll(!wantChecked);
+            updateSectionHeaderState(sectionState);
+            queueMicrotask(() => {
+              syncingFromRemote = false;
+            });
+          });
+      });
+      secEl.appendChild(secCb);
+    }
+    const secTitle = document.createElement('span');
+    secTitle.className = 'pixso-tuner-publish-sorted-sec-title';
+    const secText = document.createElement('span');
+    secText.textContent = block.title;
+    secTitle.appendChild(secText);
+    if (isLibraryPublishChangesSectionTitle(block.title)) {
+      const secMeta = document.createElement('span');
+      secMeta.className = 'pixso-tuner-publish-sorted-sec-meta';
+      sectionState.metaEl = secMeta;
+      secTitle.appendChild(secMeta);
+    }
+    secEl.appendChild(secTitle);
     list.appendChild(secEl);
-    const rows = block.rows || [];
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       const row = document.createElement('div');
       row.className = 'pixso-tuner-publish-sorted-row';
+      row.setAttribute('data-search-text', r.name || '');
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.className = 'pixso-tuner-publish-sorted-cb';
@@ -1739,11 +1926,15 @@ function renderPublishSortedOverlay(bundle) {
         if (publishSortedBulkSyncFromMaster) return;
         if (syncingFromRemote) return;
         const wantChecked = cb.checked;
+        r.checked = wantChecked;
+        updateSectionHeaderState(sectionState);
         void togglePublishModalCheckboxByName(r.name, r.listTop, wantChecked)
           .then((ok) => {
             if (!ok) {
               syncingFromRemote = true;
+              r.checked = !wantChecked;
               cb.checked = !wantChecked;
+              updateSectionHeaderState(sectionState);
               queueMicrotask(() => {
                 syncingFromRemote = false;
               });
@@ -1751,7 +1942,9 @@ function renderPublishSortedOverlay(bundle) {
           })
           .catch(() => {
             syncingFromRemote = true;
+            r.checked = !wantChecked;
             cb.checked = !wantChecked;
+            updateSectionHeaderState(sectionState);
             queueMicrotask(() => {
               syncingFromRemote = false;
             });
@@ -1772,8 +1965,10 @@ function renderPublishSortedOverlay(bundle) {
       row.appendChild(st);
       list.appendChild(row);
     }
+    updateSectionHeaderState(sectionState);
   }
   root.appendChild(list);
+  applyPublishSortedSearchFilter(root);
   attachPublishSortedOverlayScrollIsolation(root, list);
 
   const wrappers = collectLibraryPublishWrappers();
@@ -1820,6 +2015,49 @@ function removePublishScanButton() {
   if (b) b.remove();
 }
 
+function removePublishSearchInput(container) {
+  const root = container instanceof Element ? container : document;
+  const el =
+    root.querySelector(`[${PUBLISH_SEARCH_ATTR}]`) ||
+    querySelectorDeep(root, `[${PUBLISH_SEARCH_ATTR}]`);
+  if (el instanceof Element) el.remove();
+}
+
+function ensurePublishSearchInput(container) {
+  if (!(container instanceof Element)) return;
+  ensurePublishSortedOverlayStyles();
+  const header =
+    container.querySelector('.publish--change--header') ||
+    querySelectorDeep(container, '.publish--change--header');
+  if (!(header instanceof Element)) return;
+  let wrap = header.querySelector(`[${PUBLISH_SEARCH_ATTR}]`);
+  if (!(wrap instanceof Element)) {
+    wrap = document.createElement('div');
+    wrap.className = 'pixso-tuner-publish-search-wrap';
+    wrap.setAttribute(PUBLISH_SEARCH_ATTR, '');
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'pixso-tuner-publish-search';
+    input.placeholder = 'Search components';
+    input.setAttribute('aria-label', 'Search components');
+    input.addEventListener('input', () => {
+      publishSortedSearchQuery = input.value || '';
+      const overlay =
+        getPublishSortedInlinePanel() ||
+        document.getElementById(PUBLISH_SORTED_LEGACY_OVERLAY_ID);
+      if (overlay instanceof Element) {
+        applyPublishSortedSearchFilter(overlay);
+      }
+    });
+    wrap.appendChild(input);
+    header.appendChild(wrap);
+  }
+  const input = wrap.querySelector('input.pixso-tuner-publish-search');
+  if (input instanceof HTMLInputElement && input.value !== publishSortedSearchQuery) {
+    input.value = publishSortedSearchQuery;
+  }
+}
+
 function ensurePublishScanButton(container) {
   if (!(container instanceof Element)) return;
   if (container.querySelector(`[${PUBLISH_SCAN_BTN_ATTR}]`)) return;
@@ -1856,24 +2094,28 @@ function ensurePublishScanButton(container) {
   toggleInput.addEventListener('change', async () => {
     if (!toggleInput.checked) {
       removePublishSortedOverlay();
+      removePublishSearchInput(container);
       return;
     }
+    ensurePublishSearchInput(container);
     const wrappers = collectLibraryPublishWrappers();
     const w = wrappers[0];
     if (!w) {
       setPublishScanToggleChecked(false);
+      removePublishSearchInput(container);
       return;
     }
     toggleInput.disabled = true;
     const prevLabel = text.textContent;
-    text.textContent = 'Сканирование…';
+    text.textContent = 'Scanning and loading…';
     try {
       const rows = await scanLibraryPublishRowsViaScroll(w);
       renderPublishSortedOverlay(rows);
     } catch (_) {
       removePublishSortedOverlay();
       setPublishScanToggleChecked(false);
-      text.textContent = 'Ошибка';
+      removePublishSearchInput(container);
+      text.textContent = 'Error';
       window.setTimeout(() => {
         text.textContent = prevLabel;
       }, 1200);
@@ -1895,6 +2137,7 @@ function ensurePublishScanButton(container) {
 function teardownPublishSortedUiIfModalClosed() {
   removePublishSortedOverlay();
   removePublishScanButton();
+  removePublishSearchInput(document);
 }
 
 function ensureLibraryPublishScanUi() {
@@ -1911,9 +2154,9 @@ let libraryPublishScrollIdleTimer = 0;
 /** Пока идёт скролл списка, virtual list дергает childList — не запускаем проход очистки (иначе мигание) */
 let libraryPublishScrollBusyUntil = 0;
 let libraryPublishModalInDom = false;
-/** true пока выставляем все чекбоксы оверлея по футерному «выбрать всё» */
+/** true пока выставляем все чекбоксы оверлея массово внутри pumped-up view */
 let publishSortedBulkSyncFromMaster = false;
-/** debounce полного перескана оверлея после группового чекбокса */
+/** legacy timer slot; kept for safe teardown of older async branches */
 let publishSortedFooterRescanTimer = 0;
 const libraryPublishWrapperObserved = new WeakSet();
 const libraryPublishScrollObserved = new WeakSet();
@@ -1962,10 +2205,7 @@ function applyLibraryPublishSortAfterScrollIdle() {
   for (let w = 0; w < wraps.length; w++) {
     const c = closestLibraryPublishContainer(wraps[w]);
     if (!c) continue;
-    const se =
-      c.querySelector('.container.scrollbar-s') ||
-      c.querySelector('.container') ||
-      c;
+    const se = getLibraryPublishScrollElement(c);
     if (se instanceof Element && se.scrollTop < 18) {
       scheduleLibraryPublishApplyStep(run, 420);
       scheduleLibraryPublishApplyStep(run, 700);
@@ -2000,10 +2240,7 @@ function isLibraryPublishListScrollBusy() {
 function ensureLibraryPublishScrollListener(wrapper) {
   const container = closestLibraryPublishContainer(wrapper);
   if (!container) return;
-  const scrollEl =
-    container.querySelector('.container.scrollbar-s') ||
-    container.querySelector('.container') ||
-    container;
+  const scrollEl = getLibraryPublishScrollElement(container);
   if (!(scrollEl instanceof Element) || libraryPublishScrollObserved.has(scrollEl)) {
     return;
   }
@@ -2195,15 +2432,6 @@ function ensureLibraryPublishInteractionHooks() {
   document.addEventListener(
     'change',
     (e) => {
-      const footerInp = resolveFooterGroupCheckboxInputFromEvent(e);
-      if (
-        footerInp &&
-        getPublishSortedInlinePanel() &&
-        closestLibraryPublishContainer(footerInp)
-      ) {
-        setPublishSortedCheckboxesAll(!!footerInp.checked);
-        schedulePublishSortedOverlayFullRescanFromFooter();
-      }
       const t = e.target;
       if (!(t instanceof Element) || !inModal(t)) return;
       if (t.matches('input[type="checkbox"]') || t.closest('.px-checkbox')) {
@@ -2213,31 +2441,8 @@ function ensureLibraryPublishInteractionHooks() {
     true
   );
   document.addEventListener(
-    'input',
-    (e) => {
-      const footerInp = resolveFooterGroupCheckboxInputFromEvent(e);
-      if (
-        footerInp &&
-        getPublishSortedInlinePanel() &&
-        closestLibraryPublishContainer(footerInp)
-      ) {
-        setPublishSortedCheckboxesAll(!!footerInp.checked);
-        schedulePublishSortedOverlayFullRescanFromFooter();
-      }
-    },
-    true
-  );
-  document.addEventListener(
     'click',
     (e) => {
-      const footerInp = resolveFooterGroupCheckboxInputFromEvent(e);
-      if (
-        footerInp &&
-        getPublishSortedInlinePanel() &&
-        closestLibraryPublishContainer(footerInp)
-      ) {
-        schedulePublishSortedOverlayFullRescanFromFooter();
-      }
       const t = e.target;
       if (!(t instanceof Element) || !inModal(t)) return;
       if (t.closest('.px-checkbox') || t.matches('input[type="checkbox"]')) {
